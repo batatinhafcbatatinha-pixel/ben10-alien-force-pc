@@ -1,0 +1,10 @@
+[general]
+input = "C:/Users/dudua/Documents/Codex/2026-10-09/install-rea-and-connect-it-to/work/ben10-af/game_files/SLUS_218.15"
+output = "C:/Users/dudua/Documents/Codex/2026-10-09/install-rea-and-connect-it-to/work/ben10-af/project/gap-functions"
+ghidra_output = "C:/Users/dudua/Documents/Codex/2026-10-09/install-rea-and-connect-it-to/work/ben10-af/config/gap-functions.csv"
+single_file_output = false
+patch_syscalls = false
+patch_cop0 = true
+patch_cache = true
+stubs = []
+skip = []
