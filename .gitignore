@@ -48,3 +48,7 @@ project/supplemental*/
 game_files/
 .game-install.lock
 game-install-report.json
+
+# Shared PS2Recomp runtime (fork, submodule)
+!/third_party/
+!/third_party/PS2Recomp

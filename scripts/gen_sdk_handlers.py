@@ -21,6 +21,10 @@ syscalls, stubs = names('PS2_SYSCALL_LIST'), names('PS2_STUB_LIST')
 exclude_path = root / 'config/sdk-handlers-exclude.txt'
 exclude = {l.split('#')[0].strip() for l in exclude_path.read_text().splitlines()} if exclude_path.exists() else set()
 matches = tomllib.loads((root / 'config/analyzer-heuristic.toml').read_text())['general']['stubs']
+# SDK functions the analyzer missed, identified by hand ('name@0xADDR' per line, # comments).
+extra_path = root / 'config/sdk-handlers-extra.txt'
+if extra_path.exists():
+    matches += [l.split('#')[0].strip() for l in extra_path.read_text().splitlines() if l.split('#')[0].strip()]
 ghidra_wrappers = {int(s.split('@')[1], 16) for s in
                    tomllib.loads((root / 'config/ben10-af.toml').read_text())['general']['stubs']}
 

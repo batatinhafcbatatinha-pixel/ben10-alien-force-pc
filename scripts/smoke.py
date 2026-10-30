@@ -17,14 +17,12 @@ location = root / 'build-location.txt'
 build = Path(location.read_text(encoding='utf-8-sig').strip()) if location.is_file() else root / 'build/native/ps2recomp/ps2xRuntime'
 binary = build / 'ps2EntryRunner.exe'
 elf = root / 'game_files/SLUS_218.15'
-media = json.loads((root / 'analysis/game-files-verification.json').read_text())
-iso = Path(media['sourceIso'])
-for path in (binary, elf, iso):
+for path in (binary, elf):
     if not path.is_file():
         raise SystemExit(f'Required input missing: {path}')
 run = root / 'runs/smoke'
 run.mkdir(parents=True, exist_ok=True)
-command = [str(binary), str(elf), str(iso)]
+command = [str(binary), str(elf)]
 startup = subprocess.STARTUPINFO()
 startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 startup.wShowWindow = 0
@@ -32,7 +30,7 @@ started = time.monotonic()
 with (run / 'runtime.log').open('w', encoding='utf-8') as log:
     proc = subprocess.Popen(command, cwd=root, startupinfo=startup,
         stdout=log, stderr=subprocess.STDOUT,
-        env={**os.environ, 'PS2X_WINDOW_MODE': 'windowed'})
+        env={**os.environ, 'PS2X_CD_IMAGE': '', 'PS2X_WINDOW_MODE': 'windowed'})
     reason = 'exited'
     try:
         while proc.poll() is None:

@@ -35,7 +35,15 @@ else()
     # Linux/other POSIX: FFmpeg comes from the system (pkg-config); raylib 5.5 is fetched once unless
     # FETCHCONTENT_SOURCE_DIR_RAYLIB points at an existing checkout (see linux/README-linux.md).
 endif()
-add_subdirectory("${WORK_ROOT}/third_party/PS2Recomp" ps2recomp)
+# PS2Recomp runtime: the third_party/PS2Recomp submodule (fork, branch native-ports) when checked out,
+# otherwise the shared checkout next to the game folders (../third_party/PS2Recomp).
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/PS2Recomp/CMakeLists.txt")
+    set(BEN10_PS2RECOMP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/PS2Recomp")
+else()
+    set(BEN10_PS2RECOMP_DIR "${WORK_ROOT}/third_party/PS2Recomp")
+endif()
+get_filename_component(BEN10_PS2RECOMP_DIR "${BEN10_PS2RECOMP_DIR}" ABSOLUTE)
+add_subdirectory("${BEN10_PS2RECOMP_DIR}" ps2recomp)
 if(MSVC)
     # Debug info for the runtime and entry (not the AOT game library): cdb stacks with names. /Z7 works with sccache.
     target_compile_options(ps2_runtime PRIVATE /Z7)
@@ -47,9 +55,10 @@ else()
     target_compile_options(ps2EntryRunner PRIVATE -g1)
 endif()
 get_target_property(BEN10_ENTRY_SOURCES ps2EntryRunner SOURCES)
-list(REMOVE_ITEM BEN10_ENTRY_SOURCES "${WORK_ROOT}/third_party/PS2Recomp/ps2xRuntime/src/main.cpp")
+list(REMOVE_ITEM BEN10_ENTRY_SOURCES "${BEN10_PS2RECOMP_DIR}/ps2xRuntime/src/main.cpp")
 set_property(TARGET ps2EntryRunner PROPERTY SOURCES ${BEN10_ENTRY_SOURCES})
 target_sources(ps2EntryRunner PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp")
+target_compile_definitions(ps2EntryRunner PRIVATE "PS2X_SHARED_MAIN_CPP=\"${BEN10_PS2RECOMP_DIR}/ps2xRuntime/src/main.cpp\"")
 # Functions outside the Ghidra map (scripts/gen_gap_functions.py); installed into empty table slots by main.cpp.
 # Compiled in batches of 64 per translation unit: 1,174 separate /Od compiles ran out of memory (2026-10-26).
 file(GLOB BEN10_GAP_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/gap-functions/gap_*.cpp")

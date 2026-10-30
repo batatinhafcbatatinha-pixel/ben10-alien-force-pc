@@ -21,12 +21,17 @@ A GPU driver with OpenGL 4.6 and `GL_ARB_fragment_shader_interlock` (current NVI
 drivers that expose it). Without it, configure with `-DBEN10_REQUIRE_GPU_RASTERIZER=OFF` and run with `PS2X_GS=cpu`
 (slow reference renderer).
 
-## Layout and runtime patch
+## Getting the sources
 
-Same layout as on Windows: this repository next to `../third_party/PS2Recomp`. Apply the runtime changes in
-`project/ps2recomp-linux.patch` to that checkout (`patch -p1 < .../project/ps2recomp-linux.patch` inside
-`third_party/PS2Recomp`): SSE4.1 for GCC/Clang, a portable `static_assert`, a 64 MiB game-thread stack on glibc
-(`PS2X_THREAD_STACK_MB` overrides it; MSVC uses `/STACK`) and the IOP LWL/LWR load-delay fix.
+```sh
+git clone --recurse-submodules https://github.com/batatinhafcbatatinha-pixel/ben10-alien-force-pc.git
+```
+
+`third_party/PS2Recomp` is a submodule: the [PS2Recomp fork](https://github.com/batatinhafcbatatinha-pixel/PS2Recomp),
+branch `native-ports`, with the runtime changes this port needs (OpenGL GS backend, IOP HLE fixes, and for Linux:
+SSE4.1 on GCC/Clang, a portable `static_assert` and a 64 MiB game-thread stack on glibc, overridable with
+`PS2X_THREAD_STACK_MB`). Without the submodule checked out, `project/CMakeLists.txt` falls back to a shared
+`../third_party/PS2Recomp` next to the game folder.
 
 ## Build and run
 

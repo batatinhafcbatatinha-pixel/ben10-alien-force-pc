@@ -41,6 +41,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--target', default='ps2EntryRunner')
     parser.add_argument('--configure-only', action='store_true')
+    parser.add_argument('--jobs', default='2', help='parallel compile jobs')
     args = parser.parse_args()
     subprocess.run([sys.executable, str(ROOT / 'scripts/bucket_dispatch.py')], check=True)
     prebuilt = os.environ.get('BEN10_PREBUILT_AOT', '')
@@ -56,7 +57,7 @@ def main():
     run(configure,
         'native-configure.log')
     if not args.configure_only:
-        run(['cmake', '--build', BUILD, '--target', args.target, '--parallel', '2'], 'native-build.log')
+        run(['cmake', '--build', BUILD, '--target', args.target, '--parallel', str(args.jobs)], 'native-build.log')
         (ROOT / 'build-location.txt').write_text(str(BUILD / 'ps2recomp/ps2xRuntime') + '\n', encoding='utf-8')
     print(f'Native build bytes: {size()}; game was not executed')
 

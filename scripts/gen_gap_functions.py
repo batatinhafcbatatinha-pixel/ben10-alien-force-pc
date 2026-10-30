@@ -1,8 +1,13 @@
 """Translate functions the Ghidra map leaves out (analyzer starts in gaps between Ghidra functions).
 
 Writes config/gap-functions.{csv,toml}, runs the existing ps2_recomp into project/gap-functions and emits
-project/gap-functions.inc (declarations + table entries). main.cpp installs the entries only into empty slots,
-so the main AOT table always wins.
+project/gap-functions.inc (declarations + table entries). main.cpp installs the entries into the AOT table,
+replacing the label bindings the AOT emitted for those addresses (Ghidra functions still win because a gap never
+starts inside one).
+
+Besides the analyzer's starts, function-pointer only targets are recovered (same rules as Boku2): Ghidra
+`entry_` labels in gaps, code after a Ghidra function end, after `jr ra`+delay slot and after `j` (tail call)
++delay slot outside Ghidra functions, and pointers in the data that land on function-looking code (vtables).
 """
 import bisect
 import csv
@@ -14,6 +19,7 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 text_end = 0x45F4A0
+data_end = 0x49E514  # end of the loaded file image (p_filesz)
 ghidra = sorted((int(r['Start'], 16), int(r['End'], 16))
                 for r in csv.DictReader((root / 'config/ghidra-functions-only.csv').open()))
 starts = [s for s, _ in ghidra]
@@ -26,12 +32,71 @@ def covered(addr):
     return i >= 0 and ghidra[i][0] <= addr < ghidra[i][1]
 
 
-gaps = [a for a in analyzer if 0x100000 <= a < text_end and not covered(a)]
+# Ghidra's code labels in gaps (e.g. indirect-call targets) are entries too.
+labels = {int(r['Start'], 16) for r in csv.DictReader((root / 'config/ghidra-functions.csv').open())
+          if r['Name'].startswith('entry_')}
+gaps = sorted(a for a in set(analyzer) | labels if 0x100000 <= a < text_end and not covered(a))
 bounds = sorted(set(starts) | set(gaps) | {text_end})
 rows = []
 for a in gaps:
     end = bounds[bisect.bisect_right(bounds, a)]
     rows.append((f'gap_{a:08x}', a, end))
+
+# Function-pointer targets (e.g. vtables) sit inside the gap ranges above: code after every Ghidra function
+# end and after every `jr ra` + delay slot outside Ghidra functions (past nop padding) is another entry.
+# Their ranges end at the next known start; the ranges above stay as they were.
+elf = (root / 'game_files/SLUS_218.15').read_bytes()
+phoff, phnum = int.from_bytes(elf[0x1C:0x20], 'little'), int.from_bytes(elf[0x2C:0x2E], 'little')
+segments = []
+for i in range(phnum):
+    p = phoff + i * 32
+    if int.from_bytes(elf[p:p + 4], 'little') == 1:
+        segments.append((int.from_bytes(elf[p + 8:p + 12], 'little'), int.from_bytes(elf[p + 4:p + 8], 'little'),
+                         int.from_bytes(elf[p + 16:p + 20], 'little')))
+
+
+def word(a):
+    for va, off, size in segments:
+        if va <= a < va + size:
+            return int.from_bytes(elf[off + a - va:off + a - va + 4], 'little')
+    return 0
+
+
+known = set(starts) | set(gaps)
+trailing = set()
+
+
+def after(a):
+    """Start after `a` once the nop padding is skipped, if nobody claimed it yet."""
+    while a < text_end and word(a) == 0:
+        a += 4
+    if a < text_end and a not in known and not covered(a):
+        trailing.add(a)
+
+
+for _, e in ghidra:
+    after(e)
+for a in range(0x100000, text_end, 4):
+    if word(a) == 0x03E00008 and not covered(a):
+        after(a + 8)
+# Tail calls end functions too: code after a `j target` + delay slot outside Ghidra functions.
+for a in range(0x100000, text_end, 4):
+    if word(a) >> 26 == 0x02 and not covered(a):
+        after(a + 8)
+# Virtual-table and callback pointers in the data that land on a function-looking start (prologue, bare `jr ra`,
+# or right after a `jr ra`/`j` + delay slot or nop padding) and are not a known start yet.
+for a in range(text_end, data_end - 3, 4):
+    t = word(a)
+    if not (0x100000 <= t < text_end) or t & 3 or t in known or t in trailing:
+        continue
+    w, prev2 = word(t), word(t - 8)
+    if ((w >> 16) == 0x27BD and w & 0x8000) or w == 0x03E00008 or word(t - 4) == 0 or prev2 == 0x03E00008 \
+            or prev2 >> 26 == 0x02:
+        trailing.add(t)
+all_bounds = sorted(set(bounds) | trailing)
+for a in sorted(trailing):
+    rows.append((f'gap_{a:08x}', a, all_bounds[bisect.bisect_right(all_bounds, a)]))
+rows.sort(key=lambda r: r[1])
 
 out_dir = root / 'project/gap-functions'
 csv_path = root / 'config/gap-functions.csv'
