@@ -53,3 +53,6 @@ if(MSVC)
         target_compile_options(ps2_game_code PRIVATE /Od /Ob0 /fp:precise)
     endif()
 endif()
+
+set(PORT_INSTALLER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../tools/port-installer" CACHE PATH "Shared game-data installer")
+include("${PORT_INSTALLER_DIR}/runtime/extracted_files.cmake")
